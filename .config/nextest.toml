@@ -1,0 +1,22 @@
+[store]
+dir = "target/nextest"
+
+[profile.default]
+retries = 3
+status-level = "pass"
+test-threads = "num-cpus"
+
+failure-output = "immediate"
+final-status-level = "flaky"
+
+success-output = "never"
+
+fail-fast = false
+leak-timeout = "100ms"
+slow-timeout = { period = "60s" }
+
+[profile.default.junit]
+path = "junit.xml"
+report-name = "nextest-run"
+store-failure-output = true
+store-success-output = false
