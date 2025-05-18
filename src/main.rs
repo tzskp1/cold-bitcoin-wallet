@@ -1,3 +1,4 @@
+mod address;
 mod cli;
 
 use clap::Parser;
@@ -13,6 +14,9 @@ fn main() {
             dbg!("gen add");
         }
         SubCommands::Generate(Target::Key) => {
+            dbg!("gen key");
+        }
+        SubCommands::Generate(_) => {
             dbg!("gen key");
         }
     }

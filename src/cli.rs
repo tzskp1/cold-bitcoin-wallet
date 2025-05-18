@@ -4,17 +4,17 @@ use clap::{Parser, Subcommand};
 pub enum Target {
     Address,
     Key,
+    Transaction,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum SubCommands {
     #[clap(arg_required_else_help = true)]
     Sign {
-        /// log format
         #[clap(short = 'p', long = "parameter", required = true, ignore_case = true)]
         parameter: (),
     },
-    #[clap(subcommand)]
+    #[clap(subcommand, arg_required_else_help = true)]
     Generate(Target),
 }
 
