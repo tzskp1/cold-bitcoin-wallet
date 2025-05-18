@@ -10,10 +10,10 @@ fn bech32m_polymod(values: &[u8]) -> u32 {
 
     for &v in values {
         let b = chk >> 25;
-        chk = (chk & 0x1ffffff) << 5 ^ (v as u32);
-        for i in 0..5 {
+        chk = ((chk & 0x1ffffff) << 5) ^ (v as u32);
+        for (i, g) in GEN.iter().enumerate() {
             if ((b >> i) & 1) == 1 {
-                chk ^= GEN[i];
+                chk ^= g;
             }
         }
     }
@@ -38,8 +38,8 @@ fn bech32m_verify_checksum(hrp: &str, data: &[u8], checksum: &[u8; 6]) -> bool {
 fn split_by_5bits(polymod: u32) -> [u8; 6] {
     let mut result = [0; 6];
 
-    for i in 0..6 {
-        result[i] = ((polymod >> (5 * (5 - i))) & 0x1F) as u8;
+    for (i, item) in result.iter_mut().enumerate() {
+        *item = ((polymod >> (5 * (5 - i))) & 0x1F) as u8;
     }
     result
 }
@@ -200,7 +200,7 @@ mod tests {
 
     #[rstest::rstest]
     fn test_bit_converter() {
-        assert_eq!(to_8bits(&to_5bits(&vec![0xFF], vec![])), vec![0xFF]);
+        assert_eq!(to_8bits(&to_5bits(&[0xFF], vec![])), vec![0xFF]);
     }
 
     #[rstest::rstest]
