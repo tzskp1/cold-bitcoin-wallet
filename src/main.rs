@@ -1,5 +1,6 @@
 mod address;
 mod cli;
+mod key;
 
 use clap::Parser;
 use cli::{SubCommands, Target};
@@ -11,9 +12,9 @@ fn main() {
             dbg!("sign");
         }
         SubCommands::Generate(Target::Address) => {
-            dbg!("gen add");
+            // address::taproot::Address
         }
-        SubCommands::Generate(Target::Key) => {
+        SubCommands::Generate(Target::Key { path }) => {
             dbg!("gen key");
         }
         SubCommands::Generate(_) => {

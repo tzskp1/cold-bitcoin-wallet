@@ -1,10 +1,17 @@
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 #[derive(Subcommand, Debug)]
 pub enum Target {
     Address,
-    Key,
-    Transaction,
+    Key {
+        #[clap(short = 'p', long = "path", required = true, ignore_case = true)]
+        path: PathBuf,
+    },
+    Transaction {
+        #[clap(short = 'p', long = "parameter", required = true, ignore_case = true)]
+        parameter: (),
+    },
 }
 
 #[derive(Debug, Subcommand)]
