@@ -1,4 +1,6 @@
 // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
+use super::types;
+use super::types::Network;
 use hmac::{Hmac, Mac};
 use k256::elliptic_curve::Curve;
 use k256::elliptic_curve::ops::Reduce;
@@ -27,10 +29,10 @@ impl Index {
         }
     }
 
-    pub fn to_u32(&self) -> u32 {
+    pub fn to_u32(self) -> u32 {
         match self {
             Index::Hardened(index) => index + 0x80000000,
-            Index::NonHardened(index) => *index,
+            Index::NonHardened(index) => index,
         }
     }
 
@@ -41,12 +43,6 @@ impl Index {
             Index::NonHardened(index)
         }
     }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum Network {
-    Mainnet,
-    Testnet,
 }
 
 pub enum KeyType {
@@ -104,7 +100,7 @@ impl Key {
             child_number: self.child_number,
             depth: self.depth,
             key: KeyType::Public(public_key),
-            chain_code: self.chain_code.clone(),
+            chain_code: self.chain_code,
         })
     }
 
@@ -114,7 +110,7 @@ impl Key {
             KeyType::Public(public_key) => public_key.to_sec1_bytes(),
         };
         let sha256 = Sha256::digest(&public_key);
-        let ripemd160 = Ripemd160::digest(&sha256);
+        let ripemd160 = Ripemd160::digest(sha256);
         let mut fingerprint = [0u8; 4];
         fingerprint.copy_from_slice(&ripemd160[..4]);
         fingerprint
@@ -145,7 +141,6 @@ impl Key {
             return self.derive(index.incr());
         }
         let s: Scalar = Reduce::<U256>::reduce(s);
-        // let secret_key = secret_key.as_scalar_primitive() + s;
         let secret_key = secret_key.to_nonzero_scalar().add(&s);
         let secret_key = SecretKey::from_bytes(&secret_key.to_bytes());
         match secret_key {
@@ -258,8 +253,8 @@ pub fn parse_path(s: &str) -> Result<Vec<Index>, ParsePathError> {
         .split('/')
         .filter(|c| !c.is_empty())
         .map(|code| {
-            if code.ends_with('\'') {
-                code[..code.len() - 1].parse().ok().map(Index::Hardened)
+            if let Some(code) = code.strip_suffix('\'') {
+                code.parse().ok().map(Index::Hardened)
             } else {
                 code.parse().ok().map(Index::NonHardened)
             }
@@ -271,12 +266,25 @@ pub fn parse_path(s: &str) -> Result<Vec<Index>, ParsePathError> {
             }
             Some(index)
         })
-        .filter_map(|index| index)
+        .flatten()
         .collect();
     if errs.is_empty() {
         Ok(path)
     } else {
         Err(ParsePathError::InvalidChar { positions: errs })
+    }
+}
+
+pub fn derive_path(
+    seed: &[u8],
+    network: Network,
+    path: &[Index],
+) -> Result<types::SecretKey, GenerateMasterKeyError> {
+    let key = Key::derive_path(seed, network, path)?;
+    // SAFETY: It will always be a private key, so no error will occur.
+    match &key.key {
+        KeyType::Secret(key) => Ok(types::SecretKey::new(key.into())),
+        _ => unreachable!(),
     }
 }
 

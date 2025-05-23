@@ -1,9 +1,10 @@
 // https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki
 use super::bech32m::{self, Bech32m};
-use crate::key::PublicKey;
+use crate::key::{Network, PublicKey};
 use k256::elliptic_curve::{ops::Reduce, sec1::ToEncodedPoint};
 use k256::{AffinePoint, ProjectivePoint, Scalar, U256, schnorr::VerifyingKey};
 use sha2::{Digest, Sha256};
+use std::fmt::Display;
 use std::ops::Deref;
 
 fn tagged_hash(tag: &str, data: &[u8]) -> [u8; 32] {
@@ -24,12 +25,6 @@ fn tweak_pubkey(value: &VerifyingKey) -> ProjectivePoint {
     ProjectivePoint::from(public_point) + (generator * tweak)
 }
 
-#[derive(Clone)]
-pub enum Network {
-    Mainnet,
-    Testnet,
-}
-
 impl Network {
     pub fn hrp(&self) -> &str {
         match self {
@@ -41,6 +36,12 @@ impl Network {
 
 pub struct Address {
     inner: Bech32m,
+}
+
+impl Display for Address {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.fmt(f)
+    }
 }
 
 impl Deref for Address {
@@ -60,8 +61,8 @@ pub enum AddressError {
 }
 
 impl PublicKey {
-    pub fn to_address(&self, network: &Network) -> Result<Address, AddressError> {
-        let tweak_point = tweak_pubkey(&self).to_encoded_point(false);
+    pub fn to_address(&self, network: Network) -> Result<Address, AddressError> {
+        let tweak_point = tweak_pubkey(self).to_encoded_point(false);
         let tweak_point_x = tweak_point.x().ok_or(AddressError::InvalidPoint)?;
         let address = bech32m::Bech32m::new_witver1(network.hrp(), tweak_point_x)
             .ok_or(AddressError::Bech32m)?;
@@ -87,10 +88,7 @@ mod tests {
         let result = tweak_pubkey(&public_key).to_encoded_point(false);
         assert_eq!(**result.x().unwrap(), tweak_key);
         assert_eq!(
-            public_key
-                .to_address(&Network::Mainnet)
-                .unwrap()
-                .to_string(),
+            public_key.to_address(Network::Mainnet).unwrap().to_string(),
             "bc1p2wsldez5mud2yam29q22wgfh9439spgduvct83k3pm50fcxa5dps59h4z5"
         );
     }

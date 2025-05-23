@@ -1,6 +1,12 @@
-use k256::elliptic_curve::rand_core::CryptoRngCore;
 use k256::schnorr::{SigningKey, VerifyingKey};
+use rand_core::CryptoRngCore;
 use std::ops::Deref;
+
+#[derive(Clone, Copy, Debug)]
+pub enum Network {
+    Mainnet,
+    Testnet,
+}
 
 #[derive(Clone)]
 pub struct PublicKey {
@@ -48,7 +54,7 @@ impl SecretKey {
 
     pub fn to_public(&self) -> PublicKey {
         PublicKey {
-            inner: self.inner.verifying_key().clone(),
+            inner: *self.inner.verifying_key(),
         }
     }
 }
