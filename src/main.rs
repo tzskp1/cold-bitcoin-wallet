@@ -16,8 +16,7 @@ fn read_passphrase() -> std::io::Result<String> {
     out.flush()?;
     let mut input = String::new();
     stdin().read_line(&mut input)?;
-    // TODO: fix
-    // let input = input.trim_end().to_string();
+    let input = input.trim_end().to_string();
     Ok(input)
 }
 

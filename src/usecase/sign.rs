@@ -40,9 +40,10 @@ impl TryFrom<TransactionInput> for transaction::TxIn {
     type Error = TransactionInputConvertError;
 
     fn try_from(value: TransactionInput) -> Result<Self, Self::Error> {
-        let txid = hex::decode(value.txid)?
+        let mut txid: [u8; 32] = hex::decode(value.txid)?
             .try_into()
             .map_err(|x: Vec<_>| TransactionInputConvertError::Size(x.len()))?;
+        txid.reverse();
         Ok(Self {
             sequence: 0xFFFFFFFF,
             script_sig: Vec::new(),
