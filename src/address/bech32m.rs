@@ -70,43 +70,38 @@ fn base32_decode_variant(s: &str) -> Option<Vec<u8>> {
 
 fn to_8bits(values: &[u8]) -> Vec<u8> {
     let mut result = Vec::new();
-    let mut buffer: u32 = 0;
-    let mut bits_left: u8 = 0;
+    let mut acc: u32 = 0;
+    let mut bits: u8 = 0;
 
-    if let Some((last, values)) = values.split_last() {
-        for v in values.iter() {
-            buffer |= (*v as u32) << 27;
-            bits_left += 5;
-            while bits_left >= 8 {
-                result.push((buffer >> 24) as u8);
-                buffer <<= 8;
-                bits_left -= 8;
-            }
+    for &v in values {
+        acc = (acc << 5) | v as u32;
+        bits += 5;
+        while bits >= 8 {
+            bits -= 8;
+            result.push((acc >> bits) as u8);
+            acc &= (1 << bits) - 1;
         }
-        // If the total number of bits is not a multiple of 8, any trailing bits are simply dropped.
-        buffer |= (*last as u32) << (27 - bits_left);
-        result.push((buffer >> 24) as u8);
     }
 
     result
 }
 
 fn to_5bits(values: &[u8], mut result: Vec<u8>) -> Vec<u8> {
-    let mut buffer: u32 = 0;
-    let mut bits_left: u8 = 0;
+    let mut acc: u32 = 0;
+    let mut bits: u8 = 0;
 
     for v in values.iter() {
-        buffer |= (*v as u32) << (24 - bits_left);
-        bits_left += 8;
-        while bits_left >= 5 {
-            result.push(((buffer >> 27) & 0x1F) as u8);
-            buffer <<= 5;
-            bits_left -= 5;
+        acc |= (*v as u32) << (24 - bits);
+        bits += 8;
+        while bits >= 5 {
+            result.push(((acc >> 27) & 0x1F) as u8);
+            acc <<= 5;
+            bits -= 5;
         }
     }
 
-    if bits_left > 0 {
-        result.push(((buffer >> 27) & 0x1F) as u8);
+    if bits > 0 {
+        result.push(((acc >> 27) & 0x1F) as u8);
     }
 
     result
@@ -130,10 +125,16 @@ impl Bech32m {
         Some(Self { hrp, data })
     }
 
-    pub fn data(self) -> Vec<u8> {
+    pub fn data(&self, is_witness: bool) -> Option<Vec<u8>> {
         // SAFETY: Once this structure is constructed, data will always be larger than 6.
         let (data, _) = self.data.split_last_chunk::<6>().unwrap();
-        to_8bits(data)
+        let data = if is_witness {
+            let (_, data) = data.split_first()?;
+            data
+        } else {
+            data
+        };
+        Some(to_8bits(data))
     }
 
     pub fn hrp(&self) -> &str {
@@ -199,8 +200,14 @@ mod tests {
     }
 
     #[rstest::rstest]
-    fn test_bit_converter() {
+    fn test_bit_converter_roundtrip() {
         assert_eq!(to_8bits(&to_5bits(&[0xFF], vec![])), vec![0xFF]);
+    }
+
+    #[rstest::rstest]
+    fn test_bit_converter_roundtrip_long() {
+        let data: Vec<_> = (0..33).collect();
+        assert_eq!(to_8bits(&to_5bits(&data, vec![])), data);
     }
 
     #[rstest::rstest]

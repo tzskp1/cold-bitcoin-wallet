@@ -1,0 +1,21 @@
+{
+  "inputs": [
+    {
+      "txid": "8559ab067ae8c08e007c282a90bd64913e6745679727f9f15e76cdb4f7eedbd9",
+      "vout": 1,
+      "address": "tb1pqqj0xeagwy5fdcwg45tfamfx9nrcaz2d8h33qp03nksrudzrqm6syq3vzj",
+      "amount": 5000
+    }
+  ],
+  "outputs": [
+    {
+      "address": "tb1p5v6e4u94y3jp50h0mky78zxu3af49x98qr9cmrzqktyytjdn0x5qhw96f9",
+      "amount": 2500
+    },
+    {
+      "address": "tb1pqqj0xeagwy5fdcwg45tfamfx9nrcaz2d8h33qp03nksrudzrqm6syq3vzj",
+      "amount": 2000
+    }
+  ],
+  "private_key_paths": ["m/0'/1"]
+}

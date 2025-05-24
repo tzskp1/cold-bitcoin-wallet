@@ -21,6 +21,7 @@ pub enum Index {
     NonHardened(u32),
 }
 
+#[allow(dead_code)]
 impl Index {
     pub fn incr(&self) -> Self {
         match self {
@@ -45,11 +46,13 @@ impl Index {
     }
 }
 
+#[allow(dead_code)]
 pub enum KeyType {
     Secret(SecretKey),
     Public(PublicKey),
 }
 
+#[allow(dead_code)]
 pub struct Key {
     network: Network,
     parent_fingerprint: [u8; 4],
@@ -71,6 +74,7 @@ pub enum GenerateMasterKeyError {
     SecretKey(k256::elliptic_curve::Error),
 }
 
+#[allow(dead_code)]
 impl Key {
     pub fn generate_master(seed: &[u8], network: Network) -> Result<Self, GenerateMasterKeyError> {
         // SAFETY: No error because of fixed length
@@ -335,7 +339,7 @@ mod tests {
     }
 
     #[rstest::rstest]
-    fn test_encode_decode() {
+    fn test_encode_decode_roundtrip() {
         let seed = [0, 1];
         let secret_key = Key::generate_master(&seed, Network::Testnet)
             .unwrap()

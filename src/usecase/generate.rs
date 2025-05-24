@@ -1,8 +1,7 @@
-use rand_core::CryptoRngCore;
-use std::path::PathBuf;
-
 use crate::address::{self, taproot};
 use crate::key::{Network, vault, wallet};
+use rand_core::CryptoRngCore;
+use std::path::PathBuf;
 
 #[derive(thiserror::Error, Debug)]
 pub enum GenerateSeedError {

@@ -16,3 +16,5 @@
 - https://coinfaucet.eu/en/btc-testnet/
 - tx: 69e071c605f147f3a5c97c1474c16e0f0527823633aee2a645a74693ac8ed1db
 - https://mempool.space/testnet/tx/69e071c605f147f3a5c97c1474c16e0f0527823633aee2a645a74693ac8ed1db
+- 1216e52747fd6445631b7d6d94a4b4cca069df64ced8a7cdb8f0d870b2b35a65
+- cargo run -- generate address --wallet_path "m/0'/2" --network testnet
