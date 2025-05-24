@@ -86,6 +86,10 @@ impl SecretKey {
         Self { inner }
     }
 
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.inner.to_bytes().into()
+    }
+
     pub fn to_public(&self) -> PublicKey {
         PublicKey::new(*self.inner.verifying_key())
     }
