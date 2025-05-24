@@ -59,8 +59,6 @@ pub enum LoadSeedError {
     DeriveKey,
     #[error("aes error")]
     Aes(aes_gcm::Error),
-    #[error("key file not found")]
-    NotFound,
 }
 
 impl Vault {
@@ -137,8 +135,7 @@ impl Vault {
         let cipher = Aes256Gcm::new(&key.into());
         let file = File::open(&self.file_path)?;
         let reader = BufReader::new(file);
-        let key_format: Option<SeedFormat> = serde_json::from_reader(reader)?;
-        let key_format = key_format.ok_or(LoadSeedError::NotFound)?;
+        let key_format: SeedFormat = serde_json::from_reader(reader)?;
         let ciphertext = hex::decode(&key_format.seed)?;
         let seed = cipher
             .decrypt(Nonce::from_slice(&self.nonce), ciphertext.as_slice())

@@ -1,13 +1,16 @@
 // https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki
 use super::bech32m::{self, Bech32m};
 use crate::key::{Network, PublicKey};
-use k256::elliptic_curve::{ops::Reduce, sec1::ToEncodedPoint};
-use k256::{AffinePoint, ProjectivePoint, Scalar, U256, schnorr::VerifyingKey};
+use k256::elliptic_curve::{
+    Curve, ops::Reduce, ops::ReduceNonZero, point::AffineCoordinates, sec1::ToEncodedPoint,
+};
+use k256::schnorr::{SigningKey, VerifyingKey};
+use k256::{AffinePoint, NonZeroScalar, ProjectivePoint, Scalar, Secp256k1, U256};
 use sha2::{Digest, Sha256};
 use std::fmt::Display;
 use std::ops::Deref;
 
-fn tagged_hash(tag: &str, data: &[u8]) -> [u8; 32] {
+pub fn tagged_hash(tag: &str, data: &[u8]) -> [u8; 32] {
     let tag_hash = Sha256::digest(tag.as_bytes());
     let mut hasher = Sha256::new();
     hasher.update(tag_hash);
@@ -16,13 +19,37 @@ fn tagged_hash(tag: &str, data: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-fn tweak_pubkey(value: &VerifyingKey) -> ProjectivePoint {
+pub fn tweak_pubkey(value: &VerifyingKey) -> ProjectivePoint {
     let generator = AffinePoint::GENERATOR;
     let public_point = value.as_affine();
     let public_x = value.to_bytes();
     let tweak = tagged_hash("TapTweak", &public_x);
-    let tweak: Scalar = Reduce::<U256>::reduce(U256::from_be_slice(&tweak));
+    let tweak = U256::from_be_slice(&tweak);
+    // TODO: make error
+    let tweak: Scalar = Reduce::<U256>::reduce(tweak);
     ProjectivePoint::from(public_point) + (generator * tweak)
+}
+
+pub fn tweak_seckey(value: &SigningKey) -> SigningKey {
+    let generator = AffinePoint::GENERATOR;
+    let public_point = generator * value.as_nonzero_scalar().as_ref();
+    let secret_key = if public_point.to_affine().y_is_odd().into() {
+        &value.as_nonzero_scalar().negate()
+    } else {
+        value.as_nonzero_scalar()
+    };
+    let public_x = public_point.to_affine().x();
+    let tweak = tagged_hash("TapTweak", &public_x);
+    let tweak = U256::from_be_slice(&tweak);
+    // if U256::new(tweak).ge(&Secp256k1::ORDER) {
+    // }
+    // TODO: make error
+    let tweak: Scalar = Reduce::<U256>::reduce(tweak);
+    let secret_key = NonZeroScalar::new(secret_key + tweak);
+    match secret_key.into_option() {
+        Some(secret_key) => SigningKey::from(secret_key),
+        None => unimplemented!(),
+    }
 }
 
 impl Network {
@@ -67,6 +94,35 @@ impl PublicKey {
         let address = bech32m::Bech32m::new_witver1(network.hrp(), tweak_point_x)
             .ok_or(AddressError::Bech32m)?;
         Ok(Address { inner: address })
+    }
+}
+
+impl std::str::FromStr for Address {
+    type Err = bech32m::ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let inner = Bech32m::from_str(s)?;
+        Ok(Self { inner })
+    }
+}
+
+impl Address {
+    pub fn script_pubkey(&self) -> Vec<u8> {
+        let data = self.inner.data();
+        let program = &data[1..];
+        let mut script = Vec::with_capacity(34);
+        script.push(0x51); // OP_1
+        script.push(0x20); // push 32 bytes
+        script.extend_from_slice(program);
+        script
+    }
+
+    pub fn network(&self) -> Option<Network> {
+        match self.inner.hrp() {
+            "tb" => Some(Network::Testnet),
+            "bc" => Some(Network::Mainnet),
+            _ => None,
+        }
     }
 }
 

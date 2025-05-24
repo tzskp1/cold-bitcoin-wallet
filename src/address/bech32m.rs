@@ -130,7 +130,7 @@ impl Bech32m {
         Some(Self { hrp, data })
     }
 
-    pub fn data(self) -> Vec<u8> {
+    pub fn data(&self) -> Vec<u8> {
         // SAFETY: Once this structure is constructed, data will always be larger than 6.
         let (data, _) = self.data.split_last_chunk::<6>().unwrap();
         to_8bits(data)

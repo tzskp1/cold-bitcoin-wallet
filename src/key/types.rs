@@ -1,3 +1,4 @@
+use k256::schnorr::signature::hazmat::PrehashSigner;
 use k256::schnorr::{SigningKey, VerifyingKey};
 use rand_core::CryptoRngCore;
 use std::ops::Deref;
@@ -56,5 +57,10 @@ impl SecretKey {
         PublicKey {
             inner: *self.inner.verifying_key(),
         }
+    }
+
+    pub fn sign(&self, msg: &[u8; 32]) -> Option<[u8; 64]> {
+        let sig = self.inner.sign_prehash(msg).ok()?;
+        Some(sig.to_bytes())
     }
 }
