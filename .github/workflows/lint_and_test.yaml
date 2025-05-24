@@ -36,6 +36,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+      - uses: mozilla-actions/sccache-action@v0.0.8
+      - uses: rui314/setup-mold@v1
       - uses: taiki-e/install-action@v2
         with:
           tool: taplo-cli
@@ -87,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nextest-archive
-          path: backend/nextest-archive.tar.zst
+          path: nextest-archive.tar.zst
 
   test:
     needs: [build_lint]
@@ -115,5 +117,5 @@ jobs:
       - name: Upload JUnit test results
         uses: actions/upload-artifact@v4
         with:
-          name: junit-report
+          name: junit-report-${{ matrix.partition }}
           path: target/nextest/default/junit.xml
