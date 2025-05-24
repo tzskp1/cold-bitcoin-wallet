@@ -1,21 +1,13 @@
 use sha2::{Digest, Sha256};
 
+use crate::key;
+
 #[derive(thiserror::Error, Debug)]
 pub enum SignError {
     #[error("failed to sign")]
     FailedSign,
     #[error("incompatible prevout or secret_keys")]
     Length,
-}
-
-// TODO: remove redundant code
-fn tagged_hash(tag: &str, data: &[u8]) -> [u8; 32] {
-    let tag_hash = Sha256::digest(tag.as_bytes());
-    let mut hasher = Sha256::new();
-    hasher.update(tag_hash);
-    hasher.update(tag_hash);
-    hasher.update(data);
-    hasher.finalize().into()
 }
 
 /// Bitcoin transaction OutPoint.
@@ -180,7 +172,7 @@ impl Transaction {
         msg.push(0); // key_version = 0
         msg.push(hash_type);
 
-        tagged_hash("TapSighash", &msg)
+        key::tagged_hash("TapSighash", &msg)
     }
 
     pub fn sign_all_inputs(
@@ -196,7 +188,10 @@ impl Transaction {
         }
         for i in 0..self.inputs.len() {
             let sighash = self.taproot_sighash(i, prevouts, 0);
-            let sig = secret_keys[i].sign(&sighash).ok_or(SignError::FailedSign)?;
+            let sig = secret_keys[i]
+                .tweak()
+                .and_then(|sk| sk.sign(&sighash))
+                .ok_or(SignError::FailedSign)?;
             self.inputs[i].witness = vec![sig.to_vec()];
         }
         Ok(())
@@ -315,7 +310,7 @@ mod tests {
             enc.push(version);
             write_varint(script.len() as u64, &mut enc);
             enc.extend_from_slice(&script);
-            taproot::tagged_hash("TapLeaf", &enc)
+            key::tagged_hash("TapLeaf", &enc)
         }
 
         fn branch_hash(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
@@ -323,7 +318,7 @@ mod tests {
             let mut enc = Vec::new();
             enc.extend_from_slice(&l);
             enc.extend_from_slice(&r);
-            taproot::tagged_hash("TapBranch", &enc)
+            key::tagged_hash("TapBranch", &enc)
         }
 
         #[derive(Clone)]
@@ -371,7 +366,7 @@ mod tests {
             if let Some(m) = merkle {
                 data.extend_from_slice(&m);
             }
-            let tweak = taproot::tagged_hash("TapTweak", &data);
+            let tweak = key::tagged_hash("TapTweak", &data);
             let t = U256::from_be_slice(&tweak);
             let t: Scalar = Reduce::reduce(t);
             let p = ProjectivePoint::from(*pk.as_affine()) + AffinePoint::GENERATOR * t;

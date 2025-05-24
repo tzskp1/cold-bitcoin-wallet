@@ -1,56 +1,8 @@
 // https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki
 use super::bech32m::{self, Bech32m};
 use crate::key::{Network, PublicKey};
-use k256::elliptic_curve::{
-    Curve, ops::Reduce, ops::ReduceNonZero, point::AffineCoordinates, sec1::ToEncodedPoint,
-};
-use k256::schnorr::{SigningKey, VerifyingKey};
-use k256::{AffinePoint, NonZeroScalar, ProjectivePoint, Scalar, Secp256k1, U256};
-use sha2::{Digest, Sha256};
 use std::fmt::Display;
 use std::ops::Deref;
-
-pub fn tagged_hash(tag: &str, data: &[u8]) -> [u8; 32] {
-    let tag_hash = Sha256::digest(tag.as_bytes());
-    let mut hasher = Sha256::new();
-    hasher.update(tag_hash);
-    hasher.update(tag_hash);
-    hasher.update(data);
-    hasher.finalize().into()
-}
-
-pub fn tweak_pubkey(value: &VerifyingKey) -> ProjectivePoint {
-    let generator = AffinePoint::GENERATOR;
-    let public_point = value.as_affine();
-    let public_x = value.to_bytes();
-    let tweak = tagged_hash("TapTweak", &public_x);
-    let tweak = U256::from_be_slice(&tweak);
-    // TODO: make error
-    let tweak: Scalar = Reduce::<U256>::reduce(tweak);
-    ProjectivePoint::from(public_point) + (generator * tweak)
-}
-
-pub fn tweak_seckey(value: &SigningKey) -> SigningKey {
-    let generator = AffinePoint::GENERATOR;
-    let public_point = generator * value.as_nonzero_scalar().as_ref();
-    let secret_key = if public_point.to_affine().y_is_odd().into() {
-        &value.as_nonzero_scalar().negate()
-    } else {
-        value.as_nonzero_scalar()
-    };
-    let public_x = public_point.to_affine().x();
-    let tweak = tagged_hash("TapTweak", &public_x);
-    let tweak = U256::from_be_slice(&tweak);
-    // if U256::new(tweak).ge(&Secp256k1::ORDER) {
-    // }
-    // TODO: make error
-    let tweak: Scalar = Reduce::<U256>::reduce(tweak);
-    let secret_key = NonZeroScalar::new(secret_key + tweak);
-    match secret_key.into_option() {
-        Some(secret_key) => SigningKey::from(secret_key),
-        None => unimplemented!(),
-    }
-}
 
 impl Network {
     pub fn hrp(&self) -> &str {
@@ -89,9 +41,9 @@ pub enum AddressError {
 
 impl PublicKey {
     pub fn to_address(&self, network: Network) -> Result<Address, AddressError> {
-        let tweak_point = tweak_pubkey(self).to_encoded_point(false);
-        let tweak_point_x = tweak_point.x().ok_or(AddressError::InvalidPoint)?;
-        let address = bech32m::Bech32m::new_witver1(network.hrp(), tweak_point_x)
+        let tweak_point = self.tweak().ok_or(AddressError::InvalidPoint)?;
+        let tweak_point_x = tweak_point.to_bytes();
+        let address = bech32m::Bech32m::new_witver1(network.hrp(), &tweak_point_x)
             .ok_or(AddressError::Bech32m)?;
         Ok(Address { inner: address })
     }

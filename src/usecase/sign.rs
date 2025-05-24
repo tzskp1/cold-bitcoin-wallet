@@ -1,4 +1,4 @@
-use crate::address::{bech32m, taproot};
+use crate::address::{self, bech32m, taproot};
 use crate::key::{vault, wallet};
 use crate::transaction::{self, Transaction};
 use hex::FromHexError;
@@ -156,7 +156,8 @@ pub fn sign_transaction(
         .into_iter()
         .map(|path| {
             let path = wallet::parse_path(&path)?;
-            Ok(wallet::derive_path(&seed, network, &path)?)
+            let secret_key = wallet::derive_path(&seed, network, &path)?;
+            Ok(secret_key)
         })
         .collect::<Result<Vec<_>, SignTransactionError>>()?;
     let mut transaction: Transaction = parameter.try_into().unwrap();
