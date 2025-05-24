@@ -199,7 +199,7 @@ mod tests {
     }
 
     #[rstest::rstest]
-    fn test_bit_converter() {
+    fn test_bit_converter_roundtrip() {
         assert_eq!(to_8bits(&to_5bits(&[0xFF], vec![])), vec![0xFF]);
     }
 
