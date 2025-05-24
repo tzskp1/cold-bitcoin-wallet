@@ -1,8 +1,7 @@
+use crate::key;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::convert::From;
 use std::path::PathBuf;
-
-use crate::key;
 
 #[allow(deprecated)]
 fn get_default_seed_path() -> String {
@@ -41,18 +40,21 @@ pub enum Target {
         #[arg(short = 'p', long = "path", ignore_case = true, default_value = get_default_seed_path())]
         path: PathBuf,
     },
-    Transaction {
-        #[arg(short = 'p', long = "parameter", required = true, ignore_case = true)]
-        parameter: (),
-    },
 }
 
 #[derive(Debug, Subcommand)]
 pub enum SubCommands {
     #[command(arg_required_else_help = true)]
     Sign {
-        #[arg(short = 'p', long = "parameter", required = true, ignore_case = true)]
-        parameter: (),
+        #[arg(
+            short = 'p',
+            long = "parameter_path",
+            required = true,
+            ignore_case = true
+        )]
+        parameter_path: PathBuf,
+        #[arg(short = 's', long = "seed_path", ignore_case = true, default_value = get_default_seed_path())]
+        seed_path: PathBuf,
     },
     #[command(subcommand, arg_required_else_help = true)]
     Generate(Target),

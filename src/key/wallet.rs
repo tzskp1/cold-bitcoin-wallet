@@ -335,7 +335,7 @@ mod tests {
     }
 
     #[rstest::rstest]
-    fn test_encode_decode() {
+    fn test_encode_decode_roundtrip() {
         let seed = [0, 1];
         let secret_key = Key::generate_master(&seed, Network::Testnet)
             .unwrap()

@@ -1,12 +1,14 @@
 mod address;
 mod cli;
 mod key;
+mod transaction;
 mod usecase;
 
 use clap::Parser;
 use cli::{SubCommands, Target};
 use rand_core::OsRng;
-use std::io::{Write, stdin, stdout};
+use std::fs::File;
+use std::io::{BufReader, Write, stdin, stdout};
 
 fn read_passphrase() -> std::io::Result<String> {
     let mut out = stdout();
@@ -14,6 +16,7 @@ fn read_passphrase() -> std::io::Result<String> {
     out.flush()?;
     let mut input = String::new();
     stdin().read_line(&mut input)?;
+    let input = input.trim_end().to_string();
     Ok(input)
 }
 
@@ -21,8 +24,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = cli::Cli::parse();
 
     match cli.subcommand {
-        SubCommands::Sign { parameter } => {
-            dbg!("sign");
+        SubCommands::Sign {
+            parameter_path,
+            seed_path,
+        } => {
+            let pass = read_passphrase()?;
+            let file = File::open(&parameter_path)?;
+            let reader = BufReader::new(file);
+            let parameter = serde_json::from_reader(reader)?;
+            let transaction =
+                usecase::sign::sign_transaction(&mut OsRng, seed_path, parameter, pass)?;
+            println!("Transaction: {}", transaction)
         }
         SubCommands::Generate(Target::Address {
             wallet_path,
@@ -42,9 +54,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         SubCommands::Generate(Target::Seed { path }) => {
             let pass = read_passphrase()?;
             usecase::generate::generate_seed(&mut OsRng, path, pass)?;
-        }
-        SubCommands::Generate(Target::Transaction { parameter }) => {
-            dbg!("gen key");
         }
     }
     Ok(())
