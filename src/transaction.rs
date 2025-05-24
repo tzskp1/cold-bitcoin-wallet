@@ -261,12 +261,11 @@ mod tests {
 
         let sighash = tx.taproot_sighash(0, &[prevout], 0);
         let sig = k256::schnorr::Signature::try_from(&tx.inputs[0].witness[0][..]).unwrap();
-        pk.verify_prehash(&sighash, &sig).unwrap();
+        pk.tweak().unwrap().verify_prehash(&sighash, &sig).unwrap();
     }
 
     #[rstest::rstest]
     fn test_sign_taproot_vector() {
-        use crate::address::taproot;
         use k256::elliptic_curve::{ops::Reduce, point::AffineCoordinates, sec1::ToEncodedPoint};
         use k256::{AffinePoint, ProjectivePoint, Scalar, U256};
 

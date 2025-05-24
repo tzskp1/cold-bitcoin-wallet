@@ -41,9 +41,8 @@ pub enum AddressError {
 
 impl PublicKey {
     pub fn to_address(&self, network: Network) -> Result<Address, AddressError> {
-        let tweak_point = self.tweak().ok_or(AddressError::InvalidPoint)?;
-        let tweak_point_x = tweak_point.to_bytes();
-        let address = bech32m::Bech32m::new_witver1(network.hrp(), &tweak_point_x)
+        let tweaked_point = self.tweak().ok_or(AddressError::InvalidPoint)?;
+        let address = bech32m::Bech32m::new_witver1(network.hrp(), &tweaked_point.to_bytes())
             .ok_or(AddressError::Bech32m)?;
         Ok(Address { inner: address })
     }
@@ -81,6 +80,7 @@ impl Address {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use k256::schnorr::VerifyingKey;
 
     #[rstest::rstest]
     fn test_tweak_pubkey() {
@@ -92,9 +92,8 @@ mod tests {
         let tweak_key =
             hex::decode("53a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343")
                 .unwrap();
-
-        let result = tweak_pubkey(&public_key).to_encoded_point(false);
-        assert_eq!(**result.x().unwrap(), tweak_key);
+        let result = public_key.tweak().unwrap();
+        assert_eq!(result.to_bytes().to_vec(), tweak_key);
         assert_eq!(
             public_key.to_address(Network::Mainnet).unwrap().to_string(),
             "bc1p2wsldez5mud2yam29q22wgfh9439spgduvct83k3pm50fcxa5dps59h4z5"

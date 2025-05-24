@@ -1,8 +1,8 @@
+use k256::elliptic_curve::bigint::ArrayEncoding;
 use k256::elliptic_curve::{Curve, ops::Reduce, point::AffineCoordinates};
 use k256::schnorr::signature::hazmat::PrehashSigner;
 use k256::schnorr::{SigningKey, VerifyingKey};
 use k256::{AffinePoint, NonZeroScalar, ProjectivePoint, Scalar, Secp256k1, U256};
-use rand_core::CryptoRngCore;
 use sha2::{Digest, Sha256};
 use std::ops::Deref;
 
@@ -31,12 +31,6 @@ impl PublicKey {
         Self { inner }
     }
 
-    pub fn from_hex(value: &str) -> Option<Self> {
-        let inner = hex::decode(value).ok()?;
-        let inner = VerifyingKey::from_bytes(&inner).ok()?;
-        Some(Self { inner })
-    }
-
     pub fn to_bytes(&self) -> [u8; 32] {
         self.inner.to_bytes().into()
     }
@@ -52,6 +46,11 @@ impl PublicKey {
         }
         let tweak: Scalar = Reduce::<U256>::reduce(tweak);
         let tweaked_point = ProjectivePoint::from(public_point) + (generator * tweak);
+        let tweaked_point = if tweaked_point.to_affine().y_is_odd().into() {
+            -tweaked_point
+        } else {
+            tweaked_point
+        };
         let tweaked_public = k256::PublicKey::from_affine(tweaked_point.to_affine()).ok()?;
         let tweaked_public = VerifyingKey::try_from(tweaked_public).ok()?;
         Some(Self::new(tweaked_public))
@@ -75,12 +74,6 @@ impl SecretKey {
         Self { inner }
     }
 
-    pub fn random(rng: &mut impl CryptoRngCore) -> Self {
-        Self {
-            inner: SigningKey::random(rng),
-        }
-    }
-
     pub fn to_public(&self) -> PublicKey {
         PublicKey {
             inner: *self.inner.verifying_key(),
@@ -102,7 +95,7 @@ impl SecretKey {
         };
         let public_x = public_point.to_affine().x();
         let tweak = tagged_hash("TapTweak", &public_x);
-        let tweak = U256::from_be_slice(&tweak);
+        let tweak = U256::from_be_byte_array(tweak.into());
         if tweak.ge(&Secp256k1::ORDER) {
             return None;
         }
