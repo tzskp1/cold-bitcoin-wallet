@@ -117,6 +117,14 @@ pub enum SignTransactionError {
     Address(#[from] taproot::AddressError),
     #[error("transaction have no txin")]
     EmptyInput,
+    #[error(transparent)]
+    AddressParse(#[from] bech32m::ParseError),
+    #[error("only mainnet and testnet are supported")]
+    InvalidNetwork,
+    #[error(transparent)]
+    TransactionConvert(#[from] TransactionConvertError),
+    #[error(transparent)]
+    Sign(#[from] transaction::SignError),
 }
 
 pub fn sign_transaction(
@@ -130,18 +138,17 @@ pub fn sign_transaction(
         return Err(SignTransactionError::FileNotExist(seed_path));
     }
     let private_key_paths = &parameter.private_key_paths;
-    // TODO: remove unwrap
-    let prevouts: Vec<_> = parameter
+    let prevouts = parameter
         .inputs
         .iter()
         .map(|input| {
-            let addr: taproot::Address = input.address.parse().unwrap();
-            transaction::TxOut {
+            let addr: taproot::Address = input.address.parse()?;
+            Ok(transaction::TxOut {
                 script_pubkey: addr.script_pubkey(),
                 value: input.amount,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, SignTransactionError>>()?;
     let vault = vault::Vault::new(seed_path, rng)?;
     let seed = vault.load_seed(passphrase)?;
     let first_addr: taproot::Address = parameter
@@ -149,9 +156,10 @@ pub fn sign_transaction(
         .first()
         .ok_or(SignTransactionError::EmptyInput)?
         .address
-        .parse()
-        .unwrap();
-    let network = first_addr.network().unwrap();
+        .parse()?;
+    let network = first_addr
+        .network()
+        .ok_or(SignTransactionError::InvalidNetwork)?;
     let secret_keys = private_key_paths
         .into_iter()
         .map(|path| {
@@ -160,9 +168,7 @@ pub fn sign_transaction(
             Ok(secret_key)
         })
         .collect::<Result<Vec<_>, SignTransactionError>>()?;
-    let mut transaction: Transaction = parameter.try_into().unwrap();
-    transaction
-        .sign_all_inputs(&prevouts, &secret_keys)
-        .unwrap();
+    let mut transaction: Transaction = parameter.try_into()?;
+    transaction.sign_all_inputs(&prevouts, &secret_keys)?;
     Ok(hex::encode(&transaction.encode()))
 }
