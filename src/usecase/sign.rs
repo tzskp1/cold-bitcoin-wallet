@@ -56,14 +56,22 @@ impl TryFrom<TransactionInput> for transaction::TxIn {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum TransactionOutputConvertError {
+    #[error(transparent)]
+    Bech32m(#[from] bech32m::ParseError),
+    #[error(transparent)]
+    Address(#[from] taproot::AddressError),
+}
+
 impl TryFrom<TransactionOutput> for transaction::TxOut {
-    type Error = bech32m::ParseError;
+    type Error = TransactionOutputConvertError;
 
     fn try_from(value: TransactionOutput) -> Result<Self, Self::Error> {
         let addr: taproot::Address = value.address.parse()?;
         Ok(Self {
             value: value.amount,
-            script_pubkey: addr.script_pubkey(),
+            script_pubkey: addr.script_pubkey().ok_or(taproot::AddressError::Bech32m)?,
         })
     }
 }
@@ -73,7 +81,7 @@ pub enum TransactionConvertError {
     #[error(transparent)]
     TransactionInputConvert(#[from] TransactionInputConvertError),
     #[error(transparent)]
-    TransactionOutputConvert(#[from] bech32m::ParseError),
+    TransactionOutputConvert(#[from] TransactionOutputConvertError),
 }
 
 impl TryFrom<TransactionParam> for transaction::Transaction {
@@ -144,7 +152,7 @@ pub fn sign_transaction(
         .map(|input| {
             let addr: taproot::Address = input.address.parse()?;
             Ok(transaction::TxOut {
-                script_pubkey: addr.script_pubkey(),
+                script_pubkey: addr.script_pubkey().ok_or(taproot::AddressError::Bech32m)?,
                 value: input.amount,
             })
         })

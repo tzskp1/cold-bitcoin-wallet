@@ -35,7 +35,7 @@ impl Deref for Address {
 pub enum AddressError {
     #[error("point of public key is invalid")]
     InvalidPoint,
-    #[error("failed to create bech32m address")]
+    #[error("invalid bech32m address format")]
     Bech32m,
 }
 
@@ -58,14 +58,13 @@ impl std::str::FromStr for Address {
 }
 
 impl Address {
-    pub fn script_pubkey(&self) -> Vec<u8> {
-        let data = self.inner.data();
-        let program = &data[1..];
+    pub fn script_pubkey(&self) -> Option<Vec<u8>> {
+        let data = self.inner.data(true)?;
         let mut script = Vec::with_capacity(34);
         script.push(0x51); // OP_1
         script.push(0x20); // push 32 bytes
-        script.extend_from_slice(program);
-        script
+        script.extend_from_slice(&data);
+        Some(script)
     }
 
     pub fn network(&self) -> Option<Network> {

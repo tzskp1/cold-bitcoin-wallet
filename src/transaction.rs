@@ -1,3 +1,4 @@
+// https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki
 use sha2::{Digest, Sha256};
 
 use crate::key;
@@ -221,7 +222,10 @@ fn write_varbytes(data: &[u8], buf: &mut Vec<u8>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::key::{Network, PublicKey, SecretKey};
+    use crate::{
+        address::taproot,
+        key::{Network, PublicKey, SecretKey},
+    };
     use k256::schnorr::{SigningKey, signature::hazmat::PrehashVerifier};
 
     #[rstest::rstest]
@@ -235,7 +239,7 @@ mod tests {
         let sk = SecretKey::new(SigningKey::from_bytes(&[1; 32]).unwrap());
         let pk = sk.to_public();
         let addr = pk.to_address(Network::Testnet).unwrap();
-        let script_pubkey = addr.script_pubkey();
+        let script_pubkey = addr.script_pubkey().unwrap();
 
         let prevout = TxOut {
             value: 10_000,

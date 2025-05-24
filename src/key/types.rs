@@ -24,15 +24,23 @@ pub enum Network {
 #[derive(Clone)]
 pub struct PublicKey {
     inner: VerifyingKey,
+    negated: bool,
 }
 
 impl PublicKey {
     pub fn new(inner: VerifyingKey) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            negated: false,
+        }
     }
 
     pub fn to_bytes(&self) -> [u8; 32] {
         self.inner.to_bytes().into()
+    }
+
+    pub fn is_negated(&self) -> bool {
+        self.negated
     }
 
     pub fn tweak(&self) -> Option<Self> {
@@ -46,14 +54,18 @@ impl PublicKey {
         }
         let tweak: Scalar = Reduce::<U256>::reduce(tweak);
         let tweaked_point = ProjectivePoint::from(public_point) + (generator * tweak);
-        let tweaked_point = if tweaked_point.to_affine().y_is_odd().into() {
+        let negated = tweaked_point.to_affine().y_is_odd().into();
+        let tweaked_point = if negated {
             -tweaked_point
         } else {
             tweaked_point
         };
         let tweaked_public = k256::PublicKey::from_affine(tweaked_point.to_affine()).ok()?;
         let tweaked_public = VerifyingKey::try_from(tweaked_public).ok()?;
-        Some(Self::new(tweaked_public))
+        Some(Self {
+            inner: tweaked_public,
+            negated,
+        })
     }
 }
 
@@ -75,9 +87,7 @@ impl SecretKey {
     }
 
     pub fn to_public(&self) -> PublicKey {
-        PublicKey {
-            inner: *self.inner.verifying_key(),
-        }
+        PublicKey::new(*self.inner.verifying_key())
     }
 
     pub fn sign(&self, msg: &[u8; 32]) -> Option<[u8; 64]> {
