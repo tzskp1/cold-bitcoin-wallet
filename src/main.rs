@@ -43,13 +43,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let pass = read_passphrase()?;
             usecase::generate::generate_seed(&mut OsRng, path, pass)?;
         }
-        SubCommands::Generate(Target::Key {
-            wallet_path,
-            seed_path,
-        }) => {
-            let path = key::wallet::parse_path(&wallet_path)?;
-        }
-        SubCommands::Generate(_) => {
+        SubCommands::Generate(Target::Transaction { parameter }) => {
             dbg!("gen key");
         }
     }

@@ -41,12 +41,6 @@ pub enum Target {
         #[arg(short = 'p', long = "path", ignore_case = true, default_value = get_default_seed_path())]
         path: PathBuf,
     },
-    Key {
-        #[arg(short = 'w', long = "wallet_path", required = true, ignore_case = true)]
-        wallet_path: String,
-        #[arg(short = 's', long = "seed_path", ignore_case = true, default_value = get_default_seed_path())]
-        seed_path: PathBuf,
-    },
     Transaction {
         #[arg(short = 'p', long = "parameter", required = true, ignore_case = true)]
         parameter: (),
