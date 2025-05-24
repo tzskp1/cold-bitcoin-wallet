@@ -21,6 +21,7 @@ pub enum Network {
     Testnet,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct PublicKey {
     inner: VerifyingKey,
@@ -39,6 +40,7 @@ impl PublicKey {
         self.inner.to_bytes().into()
     }
 
+    #[allow(dead_code)]
     pub fn is_negated(&self) -> bool {
         self.negated
     }
@@ -86,10 +88,6 @@ impl SecretKey {
         Self { inner }
     }
 
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.inner.to_bytes().into()
-    }
-
     pub fn to_public(&self) -> PublicKey {
         PublicKey::new(*self.inner.verifying_key())
     }
@@ -115,9 +113,8 @@ impl SecretKey {
         }
         let tweak: Scalar = Reduce::<U256>::reduce(tweak);
         let secret_key = NonZeroScalar::new(secret_key + tweak);
-        match secret_key.into_option() {
-            Some(secret_key) => Some(Self::new(SigningKey::from(secret_key))),
-            None => None,
-        }
+        secret_key
+            .into_option()
+            .map(|secret_key| Self::new(SigningKey::from(secret_key)))
     }
 }

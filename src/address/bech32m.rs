@@ -206,7 +206,7 @@ mod tests {
 
     #[rstest::rstest]
     fn test_bit_converter_roundtrip_long() {
-        let data: Vec<_> = (0..33).into_iter().collect();
+        let data: Vec<_> = (0..33).collect();
         assert_eq!(to_8bits(&to_5bits(&data, vec![])), data);
     }
 

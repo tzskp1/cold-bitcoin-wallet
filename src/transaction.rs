@@ -39,6 +39,7 @@ pub struct Transaction {
     pub lock_time: u32,
 }
 
+#[allow(dead_code)]
 impl Transaction {
     pub fn new(version: i32, lock_time: u32) -> Self {
         Self {
@@ -65,23 +66,23 @@ impl Transaction {
         if has_witness {
             buf.extend_from_slice(&[0x00, 0x01]);
         }
-        write_varint(self.inputs.len() as u64, &mut buf);
+        write_varint(self.inputs.len() as u64, &mut buf).unwrap();
         for txin in &self.inputs {
             buf.extend_from_slice(&txin.previous_output.txid);
             buf.extend_from_slice(&txin.previous_output.vout.to_le_bytes());
-            write_varbytes(&txin.script_sig, &mut buf);
+            write_varbytes(&txin.script_sig, &mut buf).unwrap();
             buf.extend_from_slice(&txin.sequence.to_le_bytes());
         }
-        write_varint(self.outputs.len() as u64, &mut buf);
+        write_varint(self.outputs.len() as u64, &mut buf).unwrap();
         for txout in &self.outputs {
             buf.extend_from_slice(&txout.value.to_le_bytes());
-            write_varbytes(&txout.script_pubkey, &mut buf);
+            write_varbytes(&txout.script_pubkey, &mut buf).unwrap();
         }
         if has_witness {
             for txin in &self.inputs {
-                write_varint(txin.witness.len() as u64, &mut buf);
+                write_varint(txin.witness.len() as u64, &mut buf).unwrap();
                 for item in &txin.witness {
-                    write_varbytes(item, &mut buf);
+                    write_varbytes(item, &mut buf).unwrap();
                 }
             }
         }
@@ -93,22 +94,22 @@ impl Transaction {
     pub fn txid(&self) -> [u8; 32] {
         let mut buf = Vec::new();
         buf.extend_from_slice(&self.version.to_le_bytes());
-        write_varint(self.inputs.len() as u64, &mut buf);
+        write_varint(self.inputs.len() as u64, &mut buf).unwrap();
         for txin in &self.inputs {
             buf.extend_from_slice(&txin.previous_output.txid);
             buf.extend_from_slice(&txin.previous_output.vout.to_le_bytes());
-            write_varbytes(&txin.script_sig, &mut buf);
+            write_varbytes(&txin.script_sig, &mut buf).unwrap();
             buf.extend_from_slice(&txin.sequence.to_le_bytes());
         }
-        write_varint(self.outputs.len() as u64, &mut buf);
+        write_varint(self.outputs.len() as u64, &mut buf).unwrap();
         for txout in &self.outputs {
             buf.extend_from_slice(&txout.value.to_le_bytes());
-            write_varbytes(&txout.script_pubkey, &mut buf);
+            write_varbytes(&txout.script_pubkey, &mut buf).unwrap();
         }
         buf.extend_from_slice(&self.lock_time.to_le_bytes());
 
         let hash = Sha256::digest(&buf);
-        let hash = Sha256::digest(&hash);
+        let hash = Sha256::digest(hash);
         let mut result = [0u8; 32];
         result.copy_from_slice(&hash);
         result
@@ -119,33 +120,33 @@ impl Transaction {
 
         let mut hasher = Sha256::new();
         for input in &self.inputs {
-            hasher.update(&input.previous_output.txid);
-            hasher.update(&input.previous_output.vout.to_le_bytes());
+            hasher.update(input.previous_output.txid);
+            hasher.update(input.previous_output.vout.to_le_bytes());
         }
         let hash_prevouts = hasher.finalize();
 
         let mut hasher = Sha256::new();
         for prev in prevouts {
-            hasher.update(&prev.value.to_le_bytes());
+            hasher.update(prev.value.to_le_bytes());
         }
         let hash_amounts = hasher.finalize();
 
         let mut hasher = Sha256::new();
         for prev in prevouts {
-            write_varbytes(&prev.script_pubkey, &mut hasher);
+            write_varbytes(&prev.script_pubkey, &mut hasher).unwrap();
         }
         let hash_scriptpubkeys = hasher.finalize();
 
         let mut hasher = Sha256::new();
         for input in &self.inputs {
-            hasher.update(&input.sequence.to_le_bytes());
+            hasher.update(input.sequence.to_le_bytes());
         }
         let hash_sequences = hasher.finalize();
 
         let mut hasher = Sha256::new();
         for output in &self.outputs {
-            hasher.update(&output.value.to_le_bytes());
-            write_varbytes(&output.script_pubkey, &mut hasher);
+            hasher.update(output.value.to_le_bytes());
+            write_varbytes(&output.script_pubkey, &mut hasher).unwrap();
         }
         let hash_outputs = hasher.finalize();
 
@@ -176,9 +177,9 @@ impl Transaction {
         if secret_keys.len() != self.inputs.len() {
             return Err(SignError::Length);
         }
-        for i in 0..self.inputs.len() {
+        for (i, secret_key) in secret_keys.iter().enumerate() {
             let sighash = self.taproot_sighash(i, prevouts);
-            let sig = secret_keys[i]
+            let sig = secret_key
                 .tweak()
                 .and_then(|sk| sk.sign(&sighash))
                 .ok_or(SignError::FailedSign)?;
@@ -190,23 +191,23 @@ impl Transaction {
 
 fn write_varint(value: u64, mut buf: impl Write) -> std::io::Result<()> {
     if value < 0xfd {
-        buf.write(&[value as u8])?;
+        buf.write_all(&[value as u8])?;
     } else if value <= 0xffff {
-        buf.write(&[0xfd])?;
-        buf.write(&(value as u16).to_le_bytes())?;
+        buf.write_all(&[0xfd])?;
+        buf.write_all(&(value as u16).to_le_bytes())?;
     } else if value <= 0xffff_ffff {
-        buf.write(&[0xfe])?;
-        buf.write(&(value as u32).to_le_bytes())?;
+        buf.write_all(&[0xfe])?;
+        buf.write_all(&(value as u32).to_le_bytes())?;
     } else {
-        buf.write(&[0xff])?;
-        buf.write(&value.to_le_bytes())?;
+        buf.write_all(&[0xff])?;
+        buf.write_all(&value.to_le_bytes())?;
     }
     Ok(())
 }
 
 fn write_varbytes(data: &[u8], mut buf: impl Write) -> std::io::Result<()> {
     write_varint(data.len() as u64, &mut buf)?;
-    buf.write(data)?;
+    buf.write_all(data)?;
     Ok(())
 }
 
