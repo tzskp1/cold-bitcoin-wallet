@@ -10,9 +10,11 @@ use rand_core::OsRng;
 use std::fs::File;
 use std::io::{BufReader, Write, stdin, stdout};
 
-fn read_passphrase() -> std::io::Result<String> {
+fn read_passphrase(quiet: bool) -> std::io::Result<String> {
     let mut out = stdout();
-    print!("Enter Passphrase: ");
+    if !quiet {
+        print!("Enter Passphrase: ");
+    }
     out.flush()?;
     let mut input = String::new();
     stdin().read_line(&mut input)?;
@@ -27,21 +29,27 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         SubCommands::Sign {
             parameter_path,
             seed_path,
+            quiet,
         } => {
-            let pass = read_passphrase()?;
+            let pass = read_passphrase(quiet)?;
             let file = File::open(&parameter_path)?;
             let reader = BufReader::new(file);
             let parameter = serde_json::from_reader(reader)?;
             let transaction =
                 usecase::sign::sign_transaction(&mut OsRng, seed_path, parameter, pass)?;
-            println!("Transaction: {}", transaction)
+            if quiet {
+                println!("{}", transaction);
+            } else {
+                println!("Transaction: {}", transaction);
+            }
         }
         SubCommands::Generate(Target::Address {
             wallet_path,
             seed_path,
             network,
+            quiet,
         }) => {
-            let pass = read_passphrase()?;
+            let pass = read_passphrase(quiet)?;
             let address = usecase::generate::generate_address(
                 &mut OsRng,
                 seed_path,
@@ -49,11 +57,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 network.into(),
                 pass,
             )?;
-            println!("Address: {}", address);
+            if quiet {
+                println!("{}", address);
+            } else {
+                println!("Address: {}", address);
+            }
         }
-        SubCommands::Generate(Target::Seed { path }) => {
-            let pass = read_passphrase()?;
-            usecase::generate::generate_seed(&mut OsRng, path, pass)?;
+        SubCommands::Generate(Target::Seed { seed_path }) => {
+            let pass = read_passphrase(false)?;
+            usecase::generate::generate_seed(&mut OsRng, seed_path, pass)?;
         }
     }
     Ok(())

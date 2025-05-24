@@ -3,9 +3,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use std::convert::From;
 use std::path::PathBuf;
 
-#[allow(deprecated)]
 fn get_default_seed_path() -> String {
-    // Will no longer be deprecated in the near future
     let mut path = std::env::home_dir().unwrap();
     path.push(".config/cold-bitcoin-wallet/seed");
     path.into_os_string().into_string().unwrap()
@@ -28,38 +26,53 @@ impl From<Network> for key::Network {
 
 #[derive(Subcommand, Debug)]
 pub enum Target {
+    /// Generate a Taproot address
     Address {
-        #[arg(short = 'w', long = "wallet_path", required = true, ignore_case = true)]
+        /// derivation path of hd wallet
+        #[arg(short, long, required = true, ignore_case = true)]
         wallet_path: String,
-        #[arg(short = 's', long = "seed_path", ignore_case = true, default_value = get_default_seed_path())]
+        /// Path of the file where the wallet seed is stored
+        #[arg(short, long, ignore_case = true, default_value = get_default_seed_path())]
         seed_path: PathBuf,
-        #[arg(value_enum, short = 'n', long = "network", ignore_case = true, default_value_t = Network::Mainnet)]
+        /// Select network (mainnet/testnet)
+        #[arg(value_enum, short, long, ignore_case = true, default_value_t = Network::Mainnet)]
         network: Network,
+        /// Print address only
+        #[arg(short, long)]
+        quiet: bool,
     },
+    /// Generate the wallet seed
     Seed {
-        #[arg(short = 'p', long = "path", ignore_case = true, default_value = get_default_seed_path())]
-        path: PathBuf,
+        /// Path of the file where the wallet seed is stored
+        #[arg(short, long, ignore_case = true, default_value = get_default_seed_path())]
+        seed_path: PathBuf,
     },
 }
 
 #[derive(Debug, Subcommand)]
 pub enum SubCommands {
+    /// Assemble and sign the transaction
     #[command(arg_required_else_help = true)]
     Sign {
-        #[arg(
-            short = 'p',
-            long = "parameter_path",
-            required = true,
-            ignore_case = true
-        )]
+        /// Path to the JSON file describing the transaction parameters
+        ///
+        /// The JSON file specifies the destination address, remittance amount, etc.
+        #[arg(short, long, required = true, ignore_case = true)]
         parameter_path: PathBuf,
-        #[arg(short = 's', long = "seed_path", ignore_case = true, default_value = get_default_seed_path())]
+        /// Path of the file where the wallet seed is stored
+        #[arg(short, long, ignore_case = true, default_value = get_default_seed_path())]
         seed_path: PathBuf,
+        /// Print transaction only
+        #[arg(short, long)]
+        quiet: bool,
     },
     #[command(subcommand, arg_required_else_help = true)]
     Generate(Target),
 }
 
+/// Bitcoin Transaction Generation CLI Tool
+///
+/// Allows you to create transactions and generate signed transactions.
 #[derive(Debug, Parser)]
 #[clap(
     name = env!("CARGO_PKG_NAME"),
