@@ -135,6 +135,23 @@ pub enum SignTransactionError {
     Sign(#[from] transaction::SignError),
 }
 
+fn validate_parameter_network(
+    parameter: &TransactionParam,
+) -> Result<Network, SignTransactionError> {
+    let networks = parameter
+        .inputs
+        .iter()
+        .map(|input| &input.address)
+        .chain(parameter.outputs.iter().map(|output| &output.address))
+        .map(|address| {
+            let addr: taproot::Address = address.parse()?;
+            let addr_network = addr.network().ok_or(SignTransactionError::InvalidNetwork)?;
+            Ok(addr_network)
+        })
+        .collect::<Result<Vec<_>, SignTransactionError>>()?;
+    Ok(*networks.first().ok_or(SignTransactionError::EmptyInput)?)
+}
+
 pub fn sign_transaction(
     rng: &mut impl CryptoRngCore,
     seed_path: impl Into<PathBuf>,
@@ -149,26 +166,18 @@ pub fn sign_transaction(
     if parameter.inputs.is_empty() {
         return Err(SignTransactionError::EmptyInput);
     }
-    let mut prevouts = Vec::with_capacity(parameter.inputs.len());
-    let mut network = None;
-    for input in &parameter.inputs {
-        let addr: taproot::Address = input.address.parse()?;
-        let addr_network = addr.network().ok_or(SignTransactionError::InvalidNetwork)?;
-        if let Some(net) = network {
-            match (net, addr_network) {
-                (Network::Mainnet, Network::Mainnet) => {}
-                (Network::Testnet, Network::Testnet) => {}
-                _ => return Err(SignTransactionError::InvalidNetwork),
-            }
-        } else {
-            network = Some(addr_network);
-        }
-        prevouts.push(transaction::TxOut {
-            script_pubkey: addr.script_pubkey().ok_or(taproot::AddressError::Bech32m)?,
-            value: input.amount,
-        });
-    }
-    let network = network.unwrap();
+    let prevouts = parameter
+        .inputs
+        .iter()
+        .map(|input| {
+            let addr: taproot::Address = input.address.parse()?;
+            Ok(transaction::TxOut {
+                script_pubkey: addr.script_pubkey().ok_or(taproot::AddressError::Bech32m)?,
+                value: input.amount,
+            })
+        })
+        .collect::<Result<Vec<_>, SignTransactionError>>()?;
+    let network = validate_parameter_network(&parameter)?;
     let vault = vault::Vault::new(seed_path, rng)?;
     let seed = vault.load_seed(passphrase)?;
     let secret_keys = private_key_paths

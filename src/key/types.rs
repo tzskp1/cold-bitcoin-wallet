@@ -15,7 +15,7 @@ pub fn tagged_hash(tag: &str, data: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Network {
     Mainnet,
     Testnet,
