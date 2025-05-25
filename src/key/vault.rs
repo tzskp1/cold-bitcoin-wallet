@@ -5,8 +5,32 @@ use rand_core::CryptoRngCore;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
+use std::ops::Deref;
 use std::path::PathBuf;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
+#[derive(Zeroize, ZeroizeOnDrop)]
+pub struct Seed {
+    inner: Vec<u8>,
+}
+
+impl Deref for Seed {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl Seed {
+    pub fn new(rng: &mut impl CryptoRngCore) -> Self {
+        let mut seed = [0; 32];
+        rng.fill_bytes(&mut seed);
+        let inner = seed.to_vec();
+        seed.zeroize();
+        Self { inner }
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct SeedFormat {
@@ -107,13 +131,13 @@ impl Vault {
         Some(derived_key)
     }
 
-    pub fn save_seed(&self, passphrase: String, seed: &[u8]) -> Result<(), SaveSeedError> {
+    pub fn save_seed(&self, passphrase: String, seed: Seed) -> Result<(), SaveSeedError> {
         let mut key = self
             .derive_key(passphrase)
             .ok_or(SaveSeedError::DeriveKey)?;
         let cipher = Aes256Gcm::new(&key.into());
         let ciphertext = cipher
-            .encrypt(Nonce::from_slice(&self.nonce), seed)
+            .encrypt(Nonce::from_slice(&self.nonce), seed.as_slice())
             .map_err(SaveSeedError::Aes)?;
         let ciphertext = hex::encode(&ciphertext);
         let file = File::create(&self.file_path)?;
@@ -128,7 +152,7 @@ impl Vault {
         Ok(())
     }
 
-    pub fn load_seed(&self, passphrase: String) -> Result<Vec<u8>, LoadSeedError> {
+    pub fn load_seed(&self, passphrase: String) -> Result<Seed, LoadSeedError> {
         let mut key = self
             .derive_key(passphrase)
             .ok_or(LoadSeedError::DeriveKey)?;
@@ -141,7 +165,7 @@ impl Vault {
             .decrypt(Nonce::from_slice(&self.nonce), ciphertext.as_slice())
             .map_err(LoadSeedError::Aes)?;
         key.zeroize();
-        Ok(seed)
+        Ok(Seed { inner: seed })
     }
 }
 
@@ -160,10 +184,17 @@ mod tests {
         path.push(format!("test-vector-seed-{}", rng.next_u64()));
         let vault = Vault::new(&path, &mut rng).unwrap();
         let pass = "this is a pen";
-        vault.save_seed(pass.to_string(), &seed).unwrap();
+        vault
+            .save_seed(
+                pass.to_string(),
+                Seed {
+                    inner: seed.to_vec(),
+                },
+            )
+            .unwrap();
         let loaded = vault.load_seed(pass.to_string()).unwrap();
 
-        assert_eq!(loaded, seed);
+        assert_eq!(*loaded, &seed);
 
         std::fs::remove_file(path).unwrap();
     }
