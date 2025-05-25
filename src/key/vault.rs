@@ -148,17 +148,23 @@ impl Vault {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::RngCore;
     use rand::rngs::OsRng;
 
     #[cfg(unix)]
     #[rstest::rstest]
     fn test_save_load() {
         let seed = [0, 1];
-        let vault = Vault::new("/tmp/test-vector-seed", &mut OsRng).unwrap();
+        let mut rng = OsRng;
+        let mut path = std::env::temp_dir();
+        path.push(format!("test-vector-seed-{}", rng.next_u64()));
+        let vault = Vault::new(&path, &mut rng).unwrap();
         let pass = "this is a pen";
         vault.save_seed(pass.to_string(), &seed).unwrap();
         let loaded = vault.load_seed(pass.to_string()).unwrap();
 
         assert_eq!(loaded, seed);
+
+        std::fs::remove_file(path).unwrap();
     }
 }
