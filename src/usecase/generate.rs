@@ -40,7 +40,7 @@ pub enum GenerateAddressError {
     CreateVault(#[from] vault::CreateVaultError),
     #[error(transparent)]
     LoadSeed(#[from] vault::LoadSeedError),
-    #[error("path:{0} does not exists")]
+    #[error("path:{0} does not exist")]
     FileNotExist(PathBuf),
     #[error(transparent)]
     CreateDirectory(#[from] std::io::Error),
