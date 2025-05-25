@@ -58,7 +58,7 @@ impl Transaction {
         self.outputs.push(output);
     }
 
-    /// Serialize transaction according to BIP144.
+    /// Serialize transaction according to BIP141.
     pub fn encode(&self) -> Vec<u8> {
         let has_witness = self.inputs.iter().any(|i| !i.witness.is_empty());
         let mut buf = Vec::new();
