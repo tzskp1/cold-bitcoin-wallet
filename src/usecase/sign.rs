@@ -138,21 +138,22 @@ pub enum SignTransactionError {
 fn validate_parameter_network(
     parameter: &TransactionParam,
 ) -> Result<Network, SignTransactionError> {
-    let networks = parameter
+    let mut addrs = parameter
         .inputs
         .iter()
         .map(|input| &input.address)
-        .chain(parameter.outputs.iter().map(|output| &output.address))
-        .map(|address| {
-            let addr: taproot::Address = address.parse()?;
+        .chain(parameter.outputs.iter().map(|output| &output.address));
+    let network = addrs
+        .try_fold(None, |network, addr| {
+            let addr: taproot::Address = addr.parse()?;
             let addr_network = addr.network().ok_or(SignTransactionError::InvalidNetwork)?;
-            Ok(addr_network)
-        })
-        .collect::<Result<Vec<_>, SignTransactionError>>()?;
-    let network = *networks.first().ok_or(SignTransactionError::EmptyInput)?;
-    if !networks.iter().all(|n| *n == network) {
-        return Err(SignTransactionError::InvalidNetwork);
-    }
+            match network {
+                None => Ok(Some(addr_network)),
+                Some(network) if network == addr_network => Ok(Some(addr_network)),
+                Some(_) => Err(SignTransactionError::InvalidNetwork),
+            }
+        })?
+        .ok_or(SignTransactionError::EmptyInput)?;
     Ok(network)
 }
 
@@ -195,4 +196,68 @@ pub fn sign_transaction(
     let mut transaction: Transaction = parameter.try_into()?;
     transaction.sign_all_inputs(&prevouts, &secret_keys)?;
     Ok(hex::encode(transaction.encode()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[rstest::rstest]
+    fn test_validate_parameter_network_same() {
+        let parameter = TransactionParam {
+            inputs: vec![TransactionInput {
+                txid: String::new(),
+                vout: 0,
+                address: "tb1pqqj0xeagwy5fdcwg45tfamfx9nrcaz2d8h33qp03nksrudzrqm6syq3vzj"
+                    .to_string(),
+                amount: 0,
+            }],
+            outputs: vec![TransactionOutput {
+                address: "tb1p5v6e4u94y3jp50h0mky78zxu3af49x98qr9cmrzqktyytjdn0x5qhw96f9"
+                    .to_string(),
+                amount: 0,
+            }],
+            private_key_paths: vec![],
+        };
+        assert_eq!(
+            validate_parameter_network(&parameter).unwrap(),
+            Network::Testnet
+        );
+    }
+
+    #[rstest::rstest]
+    fn test_validate_parameter_network_mismatch() {
+        let parameter = TransactionParam {
+            inputs: vec![TransactionInput {
+                txid: String::new(),
+                vout: 0,
+                address: "tb1pqqj0xeagwy5fdcwg45tfamfx9nrcaz2d8h33qp03nksrudzrqm6syq3vzj"
+                    .to_string(),
+                amount: 0,
+            }],
+            outputs: vec![TransactionOutput {
+                address: "bc1p2wsldez5mud2yam29q22wgfh9439spgduvct83k3pm50fcxa5dps59h4z5"
+                    .to_string(),
+                amount: 0,
+            }],
+            private_key_paths: vec![],
+        };
+        assert!(matches!(
+            validate_parameter_network(&parameter),
+            Err(SignTransactionError::InvalidNetwork)
+        ));
+    }
+
+    #[rstest::rstest]
+    fn test_validate_parameter_network_empty() {
+        let parameter = TransactionParam {
+            inputs: vec![],
+            outputs: vec![],
+            private_key_paths: vec![],
+        };
+        assert!(matches!(
+            validate_parameter_network(&parameter),
+            Err(SignTransactionError::EmptyInput)
+        ));
+    }
 }

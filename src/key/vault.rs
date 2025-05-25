@@ -3,11 +3,24 @@ use aes_gcm::{Aes256Gcm, Nonce};
 use argon2::{Argon2, PasswordHasher, password_hash::SaltString};
 use rand_core::CryptoRngCore;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::ops::Deref;
 use std::path::PathBuf;
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+fn secure_create(path: &PathBuf) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+
+    options.open(path)
+}
 
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct Seed {
@@ -67,7 +80,7 @@ pub enum SaveSeedError {
     Hex(#[from] hex::FromHexError),
     #[error("derive key error")]
     DeriveKey,
-    #[error("aes error")]
+    #[error("aes error: maybe invalid passphrase")]
     Aes(aes_gcm::Error),
 }
 
@@ -81,7 +94,7 @@ pub enum LoadSeedError {
     Hex(#[from] hex::FromHexError),
     #[error("derive key error")]
     DeriveKey,
-    #[error("aes error")]
+    #[error("aes error: maybe invalid passphrase")]
     Aes(aes_gcm::Error),
 }
 
@@ -140,7 +153,7 @@ impl Vault {
             .encrypt(Nonce::from_slice(&self.nonce), seed.as_slice())
             .map_err(SaveSeedError::Aes)?;
         let ciphertext = hex::encode(&ciphertext);
-        let file = File::create(&self.file_path)?;
+        let file = secure_create(&self.file_path)?;
         let writer = BufWriter::new(file);
         let key_format = SeedFormat {
             salt: self.salt.as_str().to_string(),
