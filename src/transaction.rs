@@ -256,4 +256,43 @@ mod tests {
         let sig = k256::schnorr::Signature::try_from(&tx.inputs[0].witness[0][..]).unwrap();
         pk.tweak().unwrap().verify_prehash(&sighash, &sig).unwrap();
     }
+
+    #[rstest::rstest]
+    fn test_sign_all_inputs_length_error() {
+        let sk = SecretKey::new(SigningKey::from_bytes(&[1; 32]).unwrap());
+        let pk = sk.to_public();
+        let addr = pk.to_address(Network::Testnet).unwrap();
+        let script_pubkey = addr.script_pubkey().unwrap();
+
+        let prevout = TxOut {
+            value: 10_000,
+            script_pubkey: script_pubkey.clone(),
+        };
+        let outpoint = OutPoint {
+            txid: [2; 32],
+            vout: 0,
+        };
+        let mut tx = Transaction::new(2, 0);
+        tx.add_input(TxIn {
+            previous_output: outpoint.clone(),
+            script_sig: vec![],
+            sequence: 0xfffffffe,
+            witness: vec![],
+        });
+        tx.add_input(TxIn {
+            previous_output: outpoint,
+            script_sig: vec![],
+            sequence: 0xfffffffe,
+            witness: vec![],
+        });
+
+        // mismatched prevouts length
+        let result = tx.sign_all_inputs(&[prevout.clone()], &[sk]);
+        assert!(matches!(result, Err(SignError::Length)));
+
+        // mismatched secret_keys length
+        let sk2 = SecretKey::new(SigningKey::from_bytes(&[1; 32]).unwrap());
+        let result = tx.sign_all_inputs(&[prevout.clone(), prevout], &[sk2]);
+        assert!(matches!(result, Err(SignError::Length)));
+    }
 }

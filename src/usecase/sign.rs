@@ -1,5 +1,5 @@
 use crate::address::{bech32m, taproot};
-use crate::key::{vault, wallet};
+use crate::key::{Network, vault, wallet};
 use crate::transaction::{self, Transaction};
 use hex::FromHexError;
 use rand_core::CryptoRngCore;
@@ -32,7 +32,7 @@ pub struct TransactionParam {
 pub enum TransactionInputConvertError {
     #[error(transparent)]
     Hex(#[from] FromHexError),
-    #[error("miss match length of array: {0}")]
+    #[error("mismatched length of array: {0}")]
     Size(usize),
 }
 
@@ -113,7 +113,7 @@ pub enum SignTransactionError {
     CreateVault(#[from] vault::CreateVaultError),
     #[error(transparent)]
     LoadSeed(#[from] vault::LoadSeedError),
-    #[error("path:{0} does not exists")]
+    #[error("path:{0} does not exist")]
     FileNotExist(PathBuf),
     #[error(transparent)]
     OpenDirectory(#[from] std::io::Error),
@@ -123,7 +123,7 @@ pub enum SignTransactionError {
     GenerateMasterKey(#[from] wallet::GenerateMasterKeyError),
     #[error(transparent)]
     Address(#[from] taproot::AddressError),
-    #[error("transaction have no txin")]
+    #[error("transaction has no txin")]
     EmptyInput,
     #[error(transparent)]
     AddressParse(#[from] bech32m::ParseError),
@@ -133,6 +133,23 @@ pub enum SignTransactionError {
     TransactionConvert(#[from] TransactionConvertError),
     #[error(transparent)]
     Sign(#[from] transaction::SignError),
+}
+
+fn validate_parameter_network(
+    parameter: &TransactionParam,
+) -> Result<Network, SignTransactionError> {
+    let networks = parameter
+        .inputs
+        .iter()
+        .map(|input| &input.address)
+        .chain(parameter.outputs.iter().map(|output| &output.address))
+        .map(|address| {
+            let addr: taproot::Address = address.parse()?;
+            let addr_network = addr.network().ok_or(SignTransactionError::InvalidNetwork)?;
+            Ok(addr_network)
+        })
+        .collect::<Result<Vec<_>, SignTransactionError>>()?;
+    Ok(*networks.first().ok_or(SignTransactionError::EmptyInput)?)
 }
 
 pub fn sign_transaction(
@@ -146,6 +163,9 @@ pub fn sign_transaction(
         return Err(SignTransactionError::FileNotExist(seed_path));
     }
     let private_key_paths = &parameter.private_key_paths;
+    if parameter.inputs.is_empty() {
+        return Err(SignTransactionError::EmptyInput);
+    }
     let prevouts = parameter
         .inputs
         .iter()
@@ -157,17 +177,9 @@ pub fn sign_transaction(
             })
         })
         .collect::<Result<Vec<_>, SignTransactionError>>()?;
+    let network = validate_parameter_network(&parameter)?;
     let vault = vault::Vault::new(seed_path, rng)?;
     let seed = vault.load_seed(passphrase)?;
-    let first_addr: taproot::Address = parameter
-        .inputs
-        .first()
-        .ok_or(SignTransactionError::EmptyInput)?
-        .address
-        .parse()?;
-    let network = first_addr
-        .network()
-        .ok_or(SignTransactionError::InvalidNetwork)?;
     let secret_keys = private_key_paths
         .iter()
         .map(|path| {
