@@ -138,21 +138,22 @@ pub enum SignTransactionError {
 fn validate_parameter_network(
     parameter: &TransactionParam,
 ) -> Result<Network, SignTransactionError> {
-    let networks = parameter
+    let mut addrs = parameter
         .inputs
         .iter()
         .map(|input| &input.address)
-        .chain(parameter.outputs.iter().map(|output| &output.address))
-        .map(|address| {
-            let addr: taproot::Address = address.parse()?;
+        .chain(parameter.outputs.iter().map(|output| &output.address));
+    let network = addrs
+        .try_fold(None, |network, addr| {
+            let addr: taproot::Address = addr.parse()?;
             let addr_network = addr.network().ok_or(SignTransactionError::InvalidNetwork)?;
-            Ok(addr_network)
-        })
-        .collect::<Result<Vec<_>, SignTransactionError>>()?;
-    let network = *networks.first().ok_or(SignTransactionError::EmptyInput)?;
-    if !networks.iter().all(|n| *n == network) {
-        return Err(SignTransactionError::InvalidNetwork);
-    }
+            match network {
+                None => Ok(Some(addr_network)),
+                Some(network) if network == addr_network => Ok(Some(addr_network)),
+                Some(_) => Err(SignTransactionError::InvalidNetwork),
+            }
+        })?
+        .ok_or(SignTransactionError::EmptyInput)?;
     Ok(network)
 }
 
