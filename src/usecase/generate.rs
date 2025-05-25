@@ -27,10 +27,9 @@ pub fn generate_seed(
         return Err(GenerateSeedError::FileExist(path));
     }
     std::fs::create_dir_all(path.parent().ok_or(GenerateSeedError::Root)?)?;
-    let mut seed = [0; 32];
-    rng.fill_bytes(&mut seed);
+    let seed = vault::Seed::new(rng);
     let vault = vault::Vault::new(path, rng)?;
-    vault.save_seed(passphrase, &seed)?;
+    vault.save_seed(passphrase, seed)?;
     Ok(())
 }
 
