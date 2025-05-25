@@ -149,7 +149,11 @@ fn validate_parameter_network(
             Ok(addr_network)
         })
         .collect::<Result<Vec<_>, SignTransactionError>>()?;
-    Ok(*networks.first().ok_or(SignTransactionError::EmptyInput)?)
+    let network = *networks.first().ok_or(SignTransactionError::EmptyInput)?;
+    if !networks.iter().all(|n| *n == network) {
+        return Err(SignTransactionError::InvalidNetwork);
+    }
+    Ok(network)
 }
 
 pub fn sign_transaction(
