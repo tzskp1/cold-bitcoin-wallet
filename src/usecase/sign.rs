@@ -197,3 +197,67 @@ pub fn sign_transaction(
     transaction.sign_all_inputs(&prevouts, &secret_keys)?;
     Ok(hex::encode(transaction.encode()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[rstest::rstest]
+    fn test_validate_parameter_network_same() {
+        let parameter = TransactionParam {
+            inputs: vec![TransactionInput {
+                txid: String::new(),
+                vout: 0,
+                address: "tb1pqqj0xeagwy5fdcwg45tfamfx9nrcaz2d8h33qp03nksrudzrqm6syq3vzj"
+                    .to_string(),
+                amount: 0,
+            }],
+            outputs: vec![TransactionOutput {
+                address: "tb1p5v6e4u94y3jp50h0mky78zxu3af49x98qr9cmrzqktyytjdn0x5qhw96f9"
+                    .to_string(),
+                amount: 0,
+            }],
+            private_key_paths: vec![],
+        };
+        assert_eq!(
+            validate_parameter_network(&parameter).unwrap(),
+            Network::Testnet
+        );
+    }
+
+    #[rstest::rstest]
+    fn test_validate_parameter_network_mismatch() {
+        let parameter = TransactionParam {
+            inputs: vec![TransactionInput {
+                txid: String::new(),
+                vout: 0,
+                address: "tb1pqqj0xeagwy5fdcwg45tfamfx9nrcaz2d8h33qp03nksrudzrqm6syq3vzj"
+                    .to_string(),
+                amount: 0,
+            }],
+            outputs: vec![TransactionOutput {
+                address: "bc1p2wsldez5mud2yam29q22wgfh9439spgduvct83k3pm50fcxa5dps59h4z5"
+                    .to_string(),
+                amount: 0,
+            }],
+            private_key_paths: vec![],
+        };
+        assert!(matches!(
+            validate_parameter_network(&parameter),
+            Err(SignTransactionError::InvalidNetwork)
+        ));
+    }
+
+    #[rstest::rstest]
+    fn test_validate_parameter_network_empty() {
+        let parameter = TransactionParam {
+            inputs: vec![],
+            outputs: vec![],
+            private_key_paths: vec![],
+        };
+        assert!(matches!(
+            validate_parameter_network(&parameter),
+            Err(SignTransactionError::EmptyInput)
+        ));
+    }
+}
