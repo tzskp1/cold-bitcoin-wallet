@@ -23,6 +23,25 @@ fn secure_create(path: &PathBuf) -> std::io::Result<File> {
 }
 
 #[derive(Zeroize, ZeroizeOnDrop)]
+pub struct Passphrase {
+    inner: String,
+}
+
+impl Passphrase {
+    pub fn new(inner: String) -> Self {
+        Self { inner }
+    }
+}
+
+impl Deref for Passphrase {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct Seed {
     inner: [u8; 32],
 }
@@ -132,7 +151,7 @@ impl Vault {
         }
     }
 
-    fn derive_key(&self, mut passphrase: String) -> Option<[u8; 32]> {
+    fn derive_key(&self, passphrase: Passphrase) -> Option<[u8; 32]> {
         let argon2 = Argon2::default();
         let password_hash = argon2
             .hash_password(passphrase.as_bytes(), &self.salt)
@@ -140,11 +159,10 @@ impl Vault {
         let key = password_hash.hash?;
         let mut derived_key = [0u8; 32];
         derived_key.copy_from_slice(key.as_bytes());
-        passphrase.zeroize();
         Some(derived_key)
     }
 
-    pub fn save_seed(&self, passphrase: String, seed: Seed) -> Result<(), SaveSeedError> {
+    pub fn save_seed(&self, passphrase: Passphrase, seed: Seed) -> Result<(), SaveSeedError> {
         let mut key = self
             .derive_key(passphrase)
             .ok_or(SaveSeedError::DeriveKey)?;
@@ -165,7 +183,7 @@ impl Vault {
         Ok(())
     }
 
-    pub fn load_seed(&self, passphrase: String) -> Result<Seed, LoadSeedError> {
+    pub fn load_seed(&self, passphrase: Passphrase) -> Result<Seed, LoadSeedError> {
         let mut key = self
             .derive_key(passphrase)
             .ok_or(LoadSeedError::DeriveKey)?;
@@ -198,11 +216,11 @@ mod tests {
         let mut path = std::env::temp_dir();
         path.push(format!("test-vector-seed-{}", rng.next_u64()));
         let vault = Vault::new(&path, &mut rng).unwrap();
-        let pass = "this is a pen";
-        vault
-            .save_seed(pass.to_string(), Seed { inner: seed })
-            .unwrap();
-        let loaded = vault.load_seed(pass.to_string()).unwrap();
+        let _pass = "this is a pen";
+        let pass = Passphrase::new(_pass.into());
+        vault.save_seed(pass, Seed { inner: seed }).unwrap();
+        let pass = Passphrase::new(_pass.into());
+        let loaded = vault.load_seed(pass).unwrap();
 
         assert_eq!(*loaded, seed);
 

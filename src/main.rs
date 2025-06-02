@@ -10,7 +10,7 @@ use rand_core::OsRng;
 use std::fs::File;
 use std::io::{BufReader, Write, stdin, stdout};
 
-fn read_passphrase(quiet: bool) -> std::io::Result<String> {
+fn read_passphrase(quiet: bool) -> std::io::Result<key::vault::Passphrase> {
     let mut out = stdout();
     if !quiet {
         print!("Enter Passphrase: ");
@@ -19,7 +19,7 @@ fn read_passphrase(quiet: bool) -> std::io::Result<String> {
     let mut input = String::new();
     stdin().read_line(&mut input)?;
     let input = input.trim_end().to_string();
-    Ok(input)
+    Ok(key::vault::Passphrase::new(input))
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {

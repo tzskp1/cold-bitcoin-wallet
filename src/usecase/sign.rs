@@ -1,4 +1,5 @@
 use crate::address::{bech32m, taproot};
+use crate::key::vault::Passphrase;
 use crate::key::{Network, vault, wallet};
 use crate::transaction::{self, Transaction};
 use hex::FromHexError;
@@ -161,7 +162,7 @@ pub fn sign_transaction(
     rng: &mut impl CryptoRngCore,
     seed_path: impl Into<PathBuf>,
     parameter: TransactionParam,
-    passphrase: String,
+    passphrase: Passphrase,
 ) -> Result<String, SignTransactionError> {
     let seed_path: PathBuf = seed_path.into();
     if !seed_path.exists() {
