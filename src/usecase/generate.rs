@@ -2,6 +2,7 @@ use crate::address::{self, taproot};
 use crate::key::{Network, vault, wallet};
 use rand_core::CryptoRngCore;
 use std::path::PathBuf;
+use vault::Passphrase;
 
 #[derive(thiserror::Error, Debug)]
 pub enum GenerateSeedError {
@@ -20,7 +21,7 @@ pub enum GenerateSeedError {
 pub fn generate_seed(
     rng: &mut impl CryptoRngCore,
     path: impl Into<PathBuf>,
-    passphrase: String,
+    passphrase: Passphrase,
 ) -> Result<(), GenerateSeedError> {
     let path: PathBuf = path.into();
     if path.exists() {
@@ -56,7 +57,7 @@ pub fn generate_address(
     seed_path: impl Into<PathBuf>,
     wallet_path: String,
     network: Network,
-    passphrase: String,
+    passphrase: Passphrase,
 ) -> Result<taproot::Address, GenerateAddressError> {
     let seed_path: PathBuf = seed_path.into();
     if !seed_path.exists() {
