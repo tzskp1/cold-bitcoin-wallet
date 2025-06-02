@@ -189,7 +189,7 @@ pub fn sign_transaction(
         .iter()
         .map(|path| {
             let path = wallet::parse_path(path)?;
-            let secret_key = wallet::derive_path(&seed, network, &path)?;
+            let secret_key = wallet::derive_path(&*seed, network, &path)?;
             Ok(secret_key)
         })
         .collect::<Result<Vec<_>, SignTransactionError>>()?;
