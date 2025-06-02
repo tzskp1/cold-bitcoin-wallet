@@ -118,3 +118,27 @@ impl SecretKey {
             .map(|secret_key| Self::new(SigningKey::from(secret_key)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use k256::schnorr::VerifyingKey;
+
+    #[rstest::rstest]
+    fn test_tweak_pubkey() {
+        let public_key =
+            hex::decode("d6889cb081036e0faefa3a35157ad71086b123b2b144b649798b494c300a961d")
+                .unwrap();
+        let public_key = VerifyingKey::from_bytes(&public_key).unwrap();
+        let public_key = PublicKey::new(public_key);
+        let tweak_key =
+            hex::decode("53a1f6e454df1aa2776a2814a721372d6258050de330b3c6d10ee8f4e0dda343")
+                .unwrap();
+        let result = public_key.tweak().unwrap();
+        assert_eq!(result.to_bytes().to_vec(), tweak_key);
+        assert_eq!(
+            public_key.to_address(Network::Mainnet).unwrap().to_string(),
+            "bc1p2wsldez5mud2yam29q22wgfh9439spgduvct83k3pm50fcxa5dps59h4z5"
+        );
+    }
+}
