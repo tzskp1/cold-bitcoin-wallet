@@ -65,7 +65,7 @@ pub fn generate_address(
     let vault = vault::Vault::new(seed_path, rng)?;
     let wallet_path = wallet::parse_path(&wallet_path)?;
     let seed = vault.load_seed(passphrase)?;
-    let secret_key = wallet::derive_path(&seed, network, &wallet_path)?;
+    let secret_key = wallet::derive_path(&*seed, network, &wallet_path)?;
     let address = secret_key.to_public().to_address(network)?;
     Ok(address)
 }

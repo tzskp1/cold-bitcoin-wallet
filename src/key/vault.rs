@@ -24,11 +24,11 @@ fn secure_create(path: &PathBuf) -> std::io::Result<File> {
 
 #[derive(Zeroize, ZeroizeOnDrop)]
 pub struct Seed {
-    inner: Vec<u8>,
+    inner: [u8; 32],
 }
 
 impl Deref for Seed {
-    type Target = Vec<u8>;
+    type Target = [u8; 32];
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -37,10 +37,8 @@ impl Deref for Seed {
 
 impl Seed {
     pub fn new(rng: &mut impl CryptoRngCore) -> Self {
-        let mut seed = [0; 32];
-        rng.fill_bytes(&mut seed);
-        let inner = seed.to_vec();
-        seed.zeroize();
+        let mut inner = [0; 32];
+        rng.fill_bytes(&mut inner);
         Self { inner }
     }
 }
@@ -96,6 +94,8 @@ pub enum LoadSeedError {
     DeriveKey,
     #[error("aes error: maybe invalid passphrase")]
     Aes(aes_gcm::Error),
+    #[error("invalid seed length")]
+    Length,
 }
 
 impl Vault {
@@ -176,7 +176,9 @@ impl Vault {
         let ciphertext = hex::decode(&key_format.seed)?;
         let seed = cipher
             .decrypt(Nonce::from_slice(&self.nonce), ciphertext.as_slice())
-            .map_err(LoadSeedError::Aes)?;
+            .map_err(LoadSeedError::Aes)?
+            .try_into()
+            .map_err(|_| LoadSeedError::Length)?;
         key.zeroize();
         Ok(Seed { inner: seed })
     }
@@ -191,23 +193,18 @@ mod tests {
     #[cfg(unix)]
     #[rstest::rstest]
     fn test_save_load() {
-        let seed = [0, 1];
+        let seed = [0; 32];
         let mut rng = OsRng;
         let mut path = std::env::temp_dir();
         path.push(format!("test-vector-seed-{}", rng.next_u64()));
         let vault = Vault::new(&path, &mut rng).unwrap();
         let pass = "this is a pen";
         vault
-            .save_seed(
-                pass.to_string(),
-                Seed {
-                    inner: seed.to_vec(),
-                },
-            )
+            .save_seed(pass.to_string(), Seed { inner: seed })
             .unwrap();
         let loaded = vault.load_seed(pass.to_string()).unwrap();
 
-        assert_eq!(*loaded, &seed);
+        assert_eq!(*loaded, seed);
 
         std::fs::remove_file(path).unwrap();
     }
